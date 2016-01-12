@@ -19,7 +19,7 @@ This file is licensed under the GNU GPL.  Any version.
 
 
 import sys
-sys.path.append("../src")
+sys.path.append("../src") # run w/out install
 
 
 from fl.engine import Engine, Operator
@@ -32,30 +32,47 @@ from fl.mamdani import MamdaniRule
 def simple_ai_boat():
         fe = Engine('simple-mamdani')
 
-        #should break points
-        FMAX=85.0
-        FMIN=60.0
+        
+        """
+        RELATIVE LOCATION
 
-        #behind/ahead points
-        BAMIN=66.0
-        BAMID=40.0
-        BAMAX=14.0
+        ----------\    X       X      X       ------------
+                   \  / \     / \    / \     /
+                    \/   \   /   \  /   \   /   
+                    /\    \ /     \/     \ /     
+                   /  \    X      /\      X       
+                  /    \  / \    /  \    / \       
 
-        # about even magnitude
-        AEMAG=16.0
+         FAR        BEHIND           AHEAD       FAR
+         BEHIND              ABOUT               AHEAD
+                             EVEN
+        """
 
+        #shoulder break points in meters
+        FAR_MAX=85.0
+        FAR_MIN=60.0
+
+        #behind/ahead points in meters
+        BEHIND_AHEAD_MIN=66.0
+        BEHIND_AHEAD_MIDPOINT=40.0
+        BEHIND_AHEAD_MAX=14.0
+
+        # about even magnitude - triangle membership 
+        ABOUT_EVEN_MAGNITUDE=16.0
 
 
         relative_location = InputVariable('relative_location')
-        relative_location.term['FAR_BEHIND'] = LeftShoulder('FAR_BEHIND', -FMAX, -FMIN)
-        relative_location.term['BEHIND'] = Triangle('BEHIND', -BAMIN, -BAMID, -BAMAX)
-        relative_location.term['ABOUT_EVEN'] = Triangle('ABOUT_EVEN', -AEMAG, 0.0, AEMAG)
-        relative_location.term['AHEAD'] = Triangle('AHEAD', BAMAX, BAMID, BAMIN)
-        relative_location.term['FAR_AHEAD'] = RightShoulder('FAR_AHEAD', FMIN, FMAX)
+        relative_location.term['FAR_BEHIND'] = LeftShoulder('FAR_BEHIND', -FAR_MAX, -FAR_MIN)
+        relative_location.term['BEHIND'] = Triangle('BEHIND', -BEHIND_AHEAD_MIN, -BEHIND_AHEAD_MIDPOINT, -BEHIND_AHEAD_MAX)
+        relative_location.term['ABOUT_EVEN'] = Triangle('ABOUT_EVEN', -ABOUT_EVEN_MAGNITUDE, 0.0, ABOUT_EVEN_MAGNITUDE)
+        relative_location.term['AHEAD'] = Triangle('AHEAD', BEHIND_AHEAD_MAX, BEHIND_AHEAD_MIDPOINT, BEHIND_AHEAD_MIN)
+        relative_location.term['FAR_AHEAD'] = RightShoulder('FAR_AHEAD', FAR_MIN, FAR_MAX)
         fe.input['relative_location'] = relative_location
         
 
-        # distance in a 2000 m piece
+
+
+        # locations in a 2000 m piece in meters
         location = InputVariable('location')
         location.term['BEGINNING'] = LeftShoulder('BEGINNING', 500.0, 800.0)
         location.term['MIDDLE'] = Trapezoid('MIDDLE', 650.0, 800.0, 1500.0, 1600.0)
@@ -64,31 +81,32 @@ def simple_ai_boat():
 
 
 
+
         """
-        EASE_UP
-        AS_IS
-        LENGTHEN_OUT
-        POWER 10
-        SPRINT
+        ACTION:
+
 
         ------------\ ---------\ ----------------\  -------\  ---------
                      X          X                 \/        \/
                     / \        / \                /\        /\ 
-         EASE_UP   /   \ AS   /   \    LENGTHEN_O/  \ P10  /  \ SPRINT
+         EASE_UP   /   \ AS   /   \    LENGTHEN  /  \ P10  /  \ SPRINT
+                         IS
         """                                          
- 
-        EU_MIN=20.0
-        EU_MAX=25.0
 
-        AI_MIN=20.0
-        AI_B=35.0
-        AI_C=70.0
-        AI_MAX=75.0
+        # ACTION values are unit-less
 
-        L_MIN=70.0
-        L_B=73.0
-        L_C=77.0
-        L_MAX=80.0
+        EASE_UP_MIN=20.0   
+        EASE_UP_MAX=25.0
+
+        AS_IS_MIN=20.0
+        AS_IS_B=35.0
+        AS_IS_C=70.0
+        AS_IS_MAX=75.0
+
+        LENGTHEN_MIN=70.0
+        LENGTHEN_B=73.0
+        LENGTHEN_C=77.0
+        LENGTHEN_MAX=80.0
 
         P10_MIN=77.0
         P10_B=80.0
@@ -98,14 +116,15 @@ def simple_ai_boat():
         SPRINT_MIN=90.0
         SPRINT_MAX=95.0
 
-
         action = OutputVariable('action', default=float('nan'))
-        action.term['EASE_UP'] = LeftShoulder('EASE_UP', EU_MIN, EU_MAX)
-        action.term['AS_IS'] = Trapezoid('AS_IS', AI_MIN, AI_B, AI_C, AI_MAX)
-        action.term['LENGTHEN'] = Trapezoid('LENGTHEN', L_MIN, L_B, L_C, L_MAX)
+        action.term['EASE_UP'] = LeftShoulder('EASE_UP', EASE_UP_MIN, EASE_UP_MAX)
+        action.term['AS_IS'] = Trapezoid('AS_IS', AS_IS_MIN, AS_IS_B, AS_IS_C, AS_IS_MAX)
+        action.term['LENGTHEN'] = Trapezoid('LENGTHEN', LENGTHEN_MIN, LENGTHEN_B, LENGTHEN_C, LENGTHEN_MAX)
         action.term['P10'] = Trapezoid('P10', P10_MIN, P10_B, P10_C, P10_MAX)
         action.term['SPRINT'] = RightShoulder('SPRINT', SPRINT_MIN, SPRINT_MAX)
         fe.output['action'] = action
+
+
 
 
         
@@ -139,6 +158,10 @@ aib = simple_ai_boat()
 
 
 def get_fuzzy_output( ai_boat_distance_in, other_boat_distance_in):
+    """ return (action, location, relative_location) fuzzy variables for the given AI boat distance in and nearest competitor distance into the race
+     (returns the fuzzy variables to the gui demo can show the complete set membership values)
+    """
+
     rl_raw = ai_boat_distance_in - other_boat_distance_in
     relative_location = aib.input['relative_location']
     location = aib.input['location']
@@ -146,6 +169,5 @@ def get_fuzzy_output( ai_boat_distance_in, other_boat_distance_in):
     relative_location.input = rl_raw
     location.input = ai_boat_distance_in
     aib.process()
-    #output = action.defuzzify()
     return action, location, relative_location
 
