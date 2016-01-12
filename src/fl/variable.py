@@ -49,7 +49,9 @@ class Variable(object):
                 fuzzy.append('%f/%s' % (term.membership(x), term.name))
             else:
                 fuzzy.append('None/%s' % term.name)
-        return ' + '.join(fuzzy)
+        return '\n'.join(fuzzy)
+
+
     
 class InputVariable(Variable):
     '''An input variable.
